@@ -214,20 +214,27 @@ export class CommandCenter {
             if (!repo) {
                 return;
             }
-            const currentRef: string = await this._gitService.getCurrentBranch(repo);
-            window.showQuickPick(selectBranch(this._gitService, repo, true), { placeHolder: `Select a ref to see it's diff with ${currentRef} (${repo.root})` })
-                .then(async item => {
-                    if (item) {
-                        const leftRef = await getRefFromQuickPickItem(item, `Input a ref(sha1) to compare with ${currentRef}`);
-                        if (!leftRef) return;
-                        this._model.filesViewContext = {
-                            repo,
-                            leftRef,
-                            rightRef: currentRef,
-                            specifiedPath: null
-                        };
-                    }
-                });
+
+            const sourceBranch = await this._choseBranchOnPick(repo, `Select source branch to compare (${repo.root})`, true);
+            if (!sourceBranch) {
+                window.showErrorMessage("Invalid Branch");
+                return ;
+            }
+            
+            const targetBranch = await this._choseBranchOnPick(repo, `Select target branch to compare with ${sourceBranch.label} (${repo.root})`, true);
+            if (!targetBranch) {
+                window.showErrorMessage("Invalid Branch");
+                return ;
+            }
+            
+            const leftRef = await getRefFromQuickPickItem(sourceBranch, `Input a ref(sha1) as a source branch`);
+            const rightRef = await getRefFromQuickPickItem(targetBranch, `Input a ref(sha1) as a target branch`);
+            this._model.filesViewContext = {
+                repo,
+                leftRef,
+                rightRef,
+                specifiedPath: null
+            };
         });
     }
 
@@ -298,5 +305,12 @@ export class CommandCenter {
     private async _viewHistory(context: HistoryViewContext, all: boolean = false): Promise<void> {
         this._historyView.loadAll = all;
         await this._model.setHistoryViewContext(context);
+    }
+
+    private async _choseBranchOnPick(repo: GitRepo, placeholder: string, allowEnterSha: boolean) {
+        return window.showQuickPick(selectBranch(this._gitService, repo, allowEnterSha), { placeHolder: placeholder })
+            .then(async item => {
+               return item; 
+            });
     }
 }
