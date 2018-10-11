@@ -21,8 +21,10 @@ function toGitUri(uri: Uri, ref: string): Uri {
     });
 }
 
-async function selectBranch(gitService: GitService, repo: GitRepo, allowEnterSha?: boolean): Promise<QuickPickItem[]> {
+async function selectBranch(gitService: GitService, repo: GitRepo, allowEnterSha?: boolean, selectCurRef?: boolean): Promise<QuickPickItem[]> {
     const refs = await gitService.getRefs(repo);
+    const currentRef = await gitService.getCurrentBranch(repo);
+    const SpaceChar = '\u00a0'
     const items = refs.map(ref => {
         let description: string;
         if (ref.type === GitRefType.Head) {
@@ -32,7 +34,11 @@ async function selectBranch(gitService: GitService, repo: GitRepo, allowEnterSha
         } else if (ref.type === GitRefType.RemoteHead) {
             description = `Remote branch at ${ref.commit}`;
         }
-        return { label: ref.name || ref.commit, description };
+        let branch = { label: ref.name || ref.commit, description }
+        if (selectCurRef) {
+            branch.label = `${branch.label === currentRef ? `$(check)${SpaceChar}` : SpaceChar.repeat(4)} ${branch.label}`
+        }
+        return branch;
     });
     if (allowEnterSha) items.unshift(new EnterShaPickItem);
     return items;
@@ -215,7 +221,7 @@ export class CommandCenter {
                 return;
             }
 
-            const sourceBranch = await this._choseBranchOnPick(repo, `Select source branch to compare (${repo.root})`, true);
+            const sourceBranch = await this._choseBranchOnPick(repo, `Select source branch to compare (${repo.root})`, true, true);
             if (!sourceBranch) {
                 window.showErrorMessage("Invalid Branch");
                 return ;
@@ -307,7 +313,7 @@ export class CommandCenter {
         await this._model.setHistoryViewContext(context);
     }
 
-    private async _choseBranchOnPick(repo: GitRepo, placeholder: string, allowEnterSha: boolean) {
+    private async _choseBranchOnPick(repo: GitRepo, placeholder: string, allowEnterSha: boolean, defaultRef: boolean = false) {
         return window.showQuickPick(selectBranch(this._gitService, repo, allowEnterSha), { placeHolder: placeholder })
             .then(async item => {
                return item; 
